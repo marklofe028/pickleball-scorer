@@ -139,7 +139,7 @@ export class ScoreBoard {
   }
 
   update(state) {
-    const { game, voiceListening, voiceContinuous } = state;
+    const { game, voiceListening, voiceContinuous, whisperModel } = state;
     if (!game) return;
 
     const {
@@ -200,13 +200,18 @@ export class ScoreBoard {
     // Voice listen button
     const btnListen = this.container.querySelector('#btnListen');
     const listenLabel = this.container.querySelector('#listenLabel');
+    const modelLoading = whisperModel && whisperModel.state === 'loading';
     if (voiceListening) {
       btnListen.classList.add('footer-btn--active');
       listenLabel.textContent = 'Listening…';
+    } else if (modelLoading) {
+      btnListen.classList.remove('footer-btn--active');
+      listenLabel.textContent = whisperModel.progress ? `${whisperModel.progress}%` : 'Loading…';
     } else {
       btnListen.classList.remove('footer-btn--active');
       listenLabel.textContent = 'Listen';
     }
+    btnListen.disabled = modelLoading;
 
     // Continuous mode button
     const btnContinuous = this.container.querySelector('#btnContinuous');

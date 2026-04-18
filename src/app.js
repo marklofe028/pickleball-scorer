@@ -1,6 +1,6 @@
 import { createInitialState, rallyWon, getScoreAnnouncement } from './modules/scoring.js';
 import { loadAppState, saveAppState } from './modules/storage.js';
-import { VoiceEngine } from './modules/voice.js';
+import { WhisperEngine } from './modules/voice.js';
 import { showToast } from './modules/utils.js';
 import { SetupScreen } from './components/SetupScreen.js';
 import { ScoreBoard } from './components/ScoreBoard.js';
@@ -12,6 +12,7 @@ const DEFAULT_STATE = {
   gameHistory: [],
   voiceListening: false,
   voiceContinuous: false,
+  whisperModel: { state: 'idle', progress: 0 },
   settings: {
     teamAName: 'Team A',
     teamBName: 'Team B',
@@ -35,6 +36,9 @@ class App {
     this.dispatch = this.dispatch.bind(this);
     this._render();
     this._registerSW();
+    this._watchOnline();
+    // Pre-load Whisper model in the background so it's ready when the game starts
+    this._initVoice();
   }
 
   dispatch(action) {
@@ -110,7 +114,12 @@ class App {
       case 'TAP_LISTEN': {
         if (!this.voice) this._initVoice();
         if (!this.voice?.isSupported) {
-          showToast('Voice not supported in this browser');
+          showToast('Voice not supported in this browser — try Chrome or Safari');
+          return;
+        }
+        if (this.state.whisperModel.state === 'loading') {
+          const p = this.state.whisperModel.progress;
+          showToast(`Voice model loading${p ? ` (${p}%)` : ''}… please wait`);
           return;
         }
         if (this.state.voiceListening) {
@@ -192,7 +201,7 @@ class App {
     const b = teamBName || this.state.settings.teamBName || 'Team B';
 
     if (!this.voice) {
-      this.voice = new VoiceEngine({
+      this.voice = new WhisperEngine({
         teamAName: a,
         teamBName: b,
         onCommand: (cmd) => this._handleVoiceCommand(cmd),
@@ -203,6 +212,9 @@ class App {
         },
         onListeningChange: (listening) => {
           this._setState({ voiceListening: listening });
+        },
+        onModelStatus: (status) => {
+          this._setState({ whisperModel: { state: status.state, progress: status.progress ?? 0 } });
         },
       });
     } else {
@@ -228,9 +240,31 @@ class App {
       }
       case 'MIC_DENIED':
         showToast('Microphone access denied');
-        this._setState({ voiceListening: false, voiceContinuous: false });
+        this._setState({ voiceListening: false });
+        break;
+      case 'VOICE_ERROR':
+        showToast(cmd.message || 'Voice error');
+        this._setState({ voiceListening: false });
         break;
     }
+  }
+
+  _watchOnline() {
+    const update = () => this._setState({ online: navigator.onLine });
+    window.addEventListener('online', () => {
+      update();
+      showToast('Back online — voice available');
+    });
+    window.addEventListener('offline', () => {
+      update();
+      if (this.state.voiceListening) {
+        this.voice?.stopListening();
+        this._setState({ voiceListening: false });
+      }
+      showToast('Offline — voice unavailable, tap to score');
+    });
+    // Set initial value without triggering a render cycle
+    this.state.online = navigator.onLine;
   }
 
   _registerSW() {

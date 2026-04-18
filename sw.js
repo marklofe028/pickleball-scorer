@@ -1,4 +1,4 @@
-const CACHE = 'pickle-score-v1';
+const CACHE = 'pickle-score-v3';
 
 const ASSETS = [
   './',
@@ -11,6 +11,8 @@ const ASSETS = [
   './src/modules/storage.js',
   './src/modules/voice.js',
   './src/modules/utils.js',
+  './src/modules/whisper-worker.js',
+  './src/lib/transformers.min.js',
   './src/components/SetupScreen.js',
   './src/components/ScoreBoard.js',
   './src/components/HistoryScreen.js',
