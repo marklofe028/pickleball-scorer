@@ -1,0 +1,308 @@
+import { getScoreDisplay } from '../modules/scoring.js';
+import { escapeHtml } from '../modules/utils.js';
+
+export class ScoreBoard {
+  constructor(container, dispatch) {
+    this.container = container;
+    this.dispatch = dispatch;
+    this._init();
+  }
+
+  _init() {
+    this.container.innerHTML = `
+      <div class="screen scoreboard-screen">
+        <header class="app-header">
+          <button class="btn-icon" data-action="newGame" aria-label="New Game" title="New Game">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="app-header__brand">
+            <img src="icons/icon.svg" class="app-header__logo" alt="">
+            <span class="app-header__title">Pickle Score</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn-icon" data-action="showVcmd" aria-label="Voice commands help" title="Voice commands" style="font-size:1rem;font-weight:700;color:var(--green)">?</button>
+            <button class="btn-icon" data-action="history" aria-label="History" title="History">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <main class="scoreboard-main" role="main">
+          <!-- Teams row -->
+          <div class="teams-row">
+            <div class="team team--a" id="teamA">
+              <div class="team__header">
+                <div class="team__serve-dot" id="serveDotA" aria-hidden="true"></div>
+                <div class="team__name" id="teamAName">Team A</div>
+              </div>
+              <div class="team__score" id="scoreA" aria-live="polite">0</div>
+              <button class="btn-point btn-point--a" data-team="A" id="btnA" aria-label="Point for Team A">
+                + Point
+              </button>
+            </div>
+
+            <div class="score-center">
+              <div class="score-center__vs">VS</div>
+              <div class="score-center__server" id="serverInfo"></div>
+              <div class="score-format-badge" id="scoreFormatBadge"></div>
+            </div>
+
+            <div class="team team--b" id="teamB">
+              <div class="team__header">
+                <div class="team__serve-dot" id="serveDotB" aria-hidden="true"></div>
+                <div class="team__name" id="teamBName">Team B</div>
+              </div>
+              <div class="team__score" id="scoreB" aria-live="polite">0</div>
+              <button class="btn-point btn-point--b" data-team="B" id="btnB" aria-label="Point for Team B">
+                + Point
+              </button>
+            </div>
+          </div>
+
+          <!-- Game meta -->
+          <div class="game-meta" id="gameMeta"></div>
+
+          <!-- Voice transcript feedback -->
+          <div class="voice-transcript" id="voiceTranscript" style="display:none">
+            <span class="voice-transcript__icon">🎤</span>
+            <span id="voiceTranscriptText"></span>
+          </div>
+        </main>
+
+        <footer class="scoreboard-footer">
+          <button class="footer-btn" data-action="undo" id="btnUndo" aria-label="Undo last point">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a7 7 0 010 14H4"/></svg>
+            Undo
+          </button>
+          <button class="footer-btn footer-btn--voice" data-action="tapListen" id="btnListen" aria-label="Voice command — tap then speak">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+            <span id="listenLabel">Listen</span>
+          </button>
+          <button class="footer-btn footer-btn--speak" data-action="speakScore" aria-label="Read score aloud">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
+            Score
+          </button>
+          <button class="footer-btn footer-btn--continuous" data-action="toggleContinuous" id="btnContinuous" aria-label="Toggle always-on voice">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            <span id="continuousLabel">Always On</span>
+          </button>
+        </footer>
+
+        <!-- Voice Commands bottom sheet -->
+        <div class="vcmd-overlay" id="vcmdOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Voice commands">
+          <div class="vcmd-sheet">
+            <div class="vcmd-sheet__header">
+              <div class="vcmd-sheet__title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+                Voice Commands
+              </div>
+              <button class="vcmd-close" data-action="closeVcmd" aria-label="Close">✕</button>
+            </div>
+            <div class="vcmd-note">
+              Tap <strong>Listen</strong> then speak — or enable <strong>Always On</strong> for hands-free scoring. Use your team names for best accuracy.
+            </div>
+            <table class="voice-cmd-table">
+              <tbody id="vcmdTeamRows">
+                <tr><td class="voice-cmd-table__say">"score"</td><td>Read current score aloud</td></tr>
+                <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Add a point to that team</td></tr>
+                <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B</td></tr>
+                <tr><td class="voice-cmd-table__say">"point one" / "point two"</td><td>Team one or two</td></tr>
+                <tr><td class="voice-cmd-table__say">"undo"</td><td>Reverse last rally</td></tr>
+                <tr><td class="voice-cmd-table__say">"who's serving"</td><td>Announce serving team</td></tr>
+                <tr><td class="voice-cmd-table__say">"new game"</td><td>Start a new game</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Game Over overlay -->
+        <div class="gameover-overlay" id="gameoverOverlay" style="display:none" role="dialog" aria-modal="true">
+          <div class="gameover-card">
+            <div class="gameover-trophy">🏆</div>
+            <div class="gameover-title">Game Over!</div>
+            <div class="gameover-winner" id="gameoverWinner"></div>
+            <div class="gameover-score" id="gameoverScore"></div>
+            <div class="gameover-actions">
+              <button class="btn-primary" data-action="newGame">New Game</button>
+              <button class="btn-secondary" data-action="history">View History</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Listening pulse ring -->
+        <div class="listening-ring" id="listeningRing" style="display:none"></div>
+      </div>
+    `;
+
+    this._bindEvents();
+  }
+
+  update(state) {
+    const { game, voiceListening, voiceContinuous } = state;
+    if (!game) return;
+
+    const {
+      teamAName, teamBName, teamAScore, teamBScore,
+      servingTeam, serverNumber, gameMode, scoringType, gameTarget,
+      gameOver, winner,
+    } = game;
+
+    // Team names
+    this._text('teamAName', teamAName);
+    this._text('teamBName', teamBName);
+
+    // Update voice sheet example rows with actual team names
+    const r = this.container.querySelector('#vcmdTeamRows');
+    if (r) {
+      const a = escapeHtml(teamAName), b = escapeHtml(teamBName);
+      r.querySelector('tr:nth-child(2) .voice-cmd-table__say').textContent = `"point ${teamAName}" / "point ${teamBName}"`;
+    }
+
+    // Scores with animate-on-change
+    this._updateScore('scoreA', teamAScore);
+    this._updateScore('scoreB', teamBScore);
+
+    // Serve dots
+    this._show('serveDotA', servingTeam === 'A');
+    this._show('serveDotB', servingTeam === 'B');
+
+    // Serving team highlight
+    this._toggle('teamA', 'team--serving', servingTeam === 'A');
+    this._toggle('teamB', 'team--serving', servingTeam === 'B');
+
+    // Server info (doubles traditional only)
+    const serverInfo = this.container.querySelector('#serverInfo');
+    if (gameMode === 'doubles' && scoringType === 'traditional') {
+      serverInfo.textContent = `Server ${serverNumber}`;
+      serverInfo.style.display = 'block';
+    } else {
+      serverInfo.style.display = 'none';
+    }
+
+    // Score format badge (doubles traditional)
+    const badge = this.container.querySelector('#scoreFormatBadge');
+    if (gameMode === 'doubles' && scoringType === 'traditional') {
+      badge.textContent = getScoreDisplay(game);
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    // Game meta
+    const servingName = servingTeam === 'A' ? teamAName : teamBName;
+    this._text('gameMeta', `${servingName} serving · ${gameMode} · ${scoringType} · to ${gameTarget}`);
+
+    // Point buttons
+    this._prop('btnA', 'disabled', gameOver);
+    this._prop('btnB', 'disabled', gameOver);
+
+    // Voice listen button
+    const btnListen = this.container.querySelector('#btnListen');
+    const listenLabel = this.container.querySelector('#listenLabel');
+    if (voiceListening) {
+      btnListen.classList.add('footer-btn--active');
+      listenLabel.textContent = 'Listening…';
+    } else {
+      btnListen.classList.remove('footer-btn--active');
+      listenLabel.textContent = 'Listen';
+    }
+
+    // Continuous mode button
+    const btnContinuous = this.container.querySelector('#btnContinuous');
+    const continuousLabel = this.container.querySelector('#continuousLabel');
+    if (voiceContinuous) {
+      btnContinuous.classList.add('footer-btn--active');
+      continuousLabel.textContent = 'Always On';
+    } else {
+      btnContinuous.classList.remove('footer-btn--active');
+      continuousLabel.textContent = 'Always On';
+    }
+
+    // Listening ring
+    this._show('listeningRing', voiceListening);
+
+    // Game over overlay
+    const overlay = this.container.querySelector('#gameoverOverlay');
+    if (gameOver) {
+      overlay.style.display = 'flex';
+      const winnerName = winner === 'A' ? teamAName : teamBName;
+      this._text('gameoverWinner', `${winnerName} Wins!`);
+      this._text('gameoverScore', `${teamAScore} – ${teamBScore}`);
+    } else {
+      overlay.style.display = 'none';
+    }
+  }
+
+  showVoiceTranscript(text) {
+    const el = this.container.querySelector('#voiceTranscript');
+    const textEl = this.container.querySelector('#voiceTranscriptText');
+    if (!el || !textEl) return;
+    textEl.textContent = `"${text}"`;
+    el.style.display = 'flex';
+    clearTimeout(this._transcriptTimer);
+    this._transcriptTimer = setTimeout(() => { el.style.display = 'none'; }, 2500);
+  }
+
+  _updateScore(id, value) {
+    const el = this.container.querySelector(`#${id}`);
+    if (!el) return;
+    const current = parseInt(el.textContent, 10);
+    if (current !== value) {
+      el.textContent = value;
+      el.classList.remove('score--bump');
+      void el.offsetWidth; // reflow to restart animation
+      el.classList.add('score--bump');
+    }
+  }
+
+  _text(id, val) {
+    const el = this.container.querySelector(`#${id}`);
+    if (el) el.textContent = val;
+  }
+
+  _toggle(id, cls, on) {
+    const el = this.container.querySelector(`#${id}`);
+    if (el) el.classList.toggle(cls, on);
+  }
+
+  _show(id, visible) {
+    const el = this.container.querySelector(`#${id}`);
+    if (el) el.style.visibility = visible ? 'visible' : 'hidden';
+  }
+
+  _prop(id, prop, val) {
+    const el = this.container.querySelector(`#${id}`);
+    if (el) el[prop] = val;
+  }
+
+  _bindEvents() {
+    this.container.addEventListener('click', (e) => {
+      const team = e.target.closest('[data-team]')?.dataset.team;
+      if (team) {
+        navigator.vibrate?.(40);
+        this.dispatch({ type: 'RALLY_WON', team });
+        return;
+      }
+
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      switch (action) {
+        case 'undo':           this.dispatch({ type: 'UNDO' }); break;
+        case 'tapListen':      this.dispatch({ type: 'TAP_LISTEN' }); break;
+        case 'speakScore':     this.dispatch({ type: 'SPEAK_SCORE' }); break;
+        case 'toggleContinuous': this.dispatch({ type: 'TOGGLE_CONTINUOUS' }); break;
+        case 'newGame':        this.dispatch({ type: 'CONFIRM_NEW_GAME' }); break;
+        case 'history':        this.dispatch({ type: 'NAVIGATE', view: 'history' }); break;
+        case 'showVcmd': {
+          const ol = this.container.querySelector('#vcmdOverlay');
+          if (ol) ol.style.display = 'flex';
+          break;
+        }
+        case 'closeVcmd': {
+          const ol = this.container.querySelector('#vcmdOverlay');
+          if (ol) ol.style.display = 'none';
+          break;
+        }
+      }
+    });
+  }
+}

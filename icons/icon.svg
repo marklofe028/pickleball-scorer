@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="36" fill="#0a0e1a"/>
+  <!-- Pickleball (yellow ball with holes) -->
+  <circle cx="96" cy="86" r="56" fill="#f7c948" stroke="#d4a800" stroke-width="3"/>
+  <!-- Hole pattern -->
+  <circle cx="96" cy="66" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <circle cx="76" cy="79" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <circle cx="116" cy="79" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <circle cx="86" cy="93" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <circle cx="106" cy="93" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <circle cx="76" cy="107" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <circle cx="116" cy="107" r="7.5" fill="#0a0e1a" opacity="0.55"/>
+  <!-- Label -->
+  <text x="96" y="167" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#84cc16" letter-spacing="1">PICKLE SCORE</text>
+</svg>

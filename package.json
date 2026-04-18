@@ -1,0 +1,12 @@
+{
+  "name": "pickleball-scorer",
+  "version": "1.0.0",
+  "description": "Pickleball Score Tracker with Voice Commands — PWA",
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "start": "npx serve . -p 8080"
+  },
+  "devDependencies": {
+    "serve": "^14.2.6"
+  }
+}
