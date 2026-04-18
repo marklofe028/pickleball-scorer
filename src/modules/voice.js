@@ -1,4 +1,30 @@
 /**
+ * Decode an audio Blob ArrayBuffer and resample it to a 16 kHz Float32Array.
+ * Whisper always expects 16 kHz mono PCM; this also creates an independent
+ * copy so the data survives AudioContext.close() and postMessage serialisation.
+ */
+async function resampleTo16k(arrayBuffer) {
+  const decodeCtx = new AudioContext();
+  const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
+
+  if (decoded.sampleRate === 16000) {
+    const copy = new Float32Array(decoded.getChannelData(0));
+    await decodeCtx.close();
+    return copy;
+  }
+
+  const targetLength = Math.ceil(decoded.duration * 16000);
+  const offlineCtx = new OfflineAudioContext(1, targetLength, 16000);
+  const src = offlineCtx.createBufferSource();
+  src.buffer = decoded;
+  src.connect(offlineCtx.destination);
+  src.start(0);
+  const resampled = await offlineCtx.startRendering();
+  await decodeCtx.close();
+  return new Float32Array(resampled.getChannelData(0));
+}
+
+/**
  * VoiceEngine — wraps Web Speech API (recognition + synthesis).
  *
  * Modes:
@@ -269,11 +295,8 @@ export class WhisperEngine {
         try {
           const blob = new Blob(chunks, { type: this._recorder?.mimeType || 'audio/webm' });
           const arrayBuffer = await blob.arrayBuffer();
-          const decodeCtx = new AudioContext();
-          const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
-          decodeCtx.close();
-          const audio = decoded.getChannelData(0);
-          this._worker.postMessage({ type: 'transcribe', audio, sampleRate: decoded.sampleRate });
+          const audio = await resampleTo16k(arrayBuffer);
+          this._worker.postMessage({ type: 'transcribe', audio, sampleRate: 16000 });
         } catch {
           if (this.isListening) this._record();
         }

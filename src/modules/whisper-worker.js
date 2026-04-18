@@ -31,10 +31,11 @@ self.onmessage = async ({ data }) => {
     case 'transcribe': {
       if (!asr) { self.postMessage({ type: 'error', message: 'Model not loaded' }); return; }
       try {
-        const result = await asr(
-          { array: data.audio, sampling_rate: data.sampleRate },
-          { language: 'english', task: 'transcribe' }
-        );
+        const result = await asr(data.audio, {
+          sampling_rate: data.sampleRate,
+          language: 'english',
+          task: 'transcribe',
+        });
         self.postMessage({ type: 'transcript', text: result.text.trim() });
       } catch (e) {
         self.postMessage({ type: 'error', message: e.message });

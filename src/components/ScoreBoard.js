@@ -385,6 +385,25 @@ export class ScoreBoard {
     this.container.addEventListener('click', this._clickHandler);
   }
 
+  async _resampleTo16k(arrayBuffer) {
+    const decodeCtx = new AudioContext();
+    const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
+    if (decoded.sampleRate === 16000) {
+      const copy = new Float32Array(decoded.getChannelData(0));
+      await decodeCtx.close();
+      return copy;
+    }
+    const targetLength = Math.ceil(decoded.duration * 16000);
+    const offlineCtx = new OfflineAudioContext(1, targetLength, 16000);
+    const src = offlineCtx.createBufferSource();
+    src.buffer = decoded;
+    src.connect(offlineCtx.destination);
+    src.start(0);
+    const resampled = await offlineCtx.startRendering();
+    await decodeCtx.close();
+    return new Float32Array(resampled.getChannelData(0));
+  }
+
   // ── Diagnostics ───────────────────────────────────────────────────────────
 
   _diagCheckPerm() {
@@ -447,10 +466,10 @@ export class ScoreBoard {
         try {
           const blob = new Blob(chunks, { type: this._diagRecorder.mimeType });
           const arrayBuffer = await blob.arrayBuffer();
-          const decodeCtx = new AudioContext();
-          const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
-          decodeCtx.close();
           if (hint) hint.textContent = 'Processing with Whisper…';
+
+          // Resample to 16 kHz independent Float32Array before sending to worker
+          const audio = await this._resampleTo16k(arrayBuffer);
 
           // Reuse the app's voice worker via a one-shot approach
           const workerUrl = new URL('../modules/whisper-worker.js', import.meta.url);
@@ -458,7 +477,6 @@ export class ScoreBoard {
             this._diagWorker = new Worker(workerUrl, { type: 'module' });
             this._diagWorker.postMessage({ type: 'load' });
           }
-          const audio = decoded.getChannelData(0);
           this._diagWorker.onmessage = ({ data }) => {
             if (data.type === 'transcript') {
               if (box) box.innerHTML = `<span style="color:var(--green);font-size:1rem">"${data.text || '(nothing heard)'}"</span>`;
@@ -468,7 +486,7 @@ export class ScoreBoard {
               if (hint) hint.textContent = 'Whisper error — see above.';
             }
           };
-          this._diagWorker.postMessage({ type: 'transcribe', audio, sampleRate: decoded.sampleRate });
+          this._diagWorker.postMessage({ type: 'transcribe', audio, sampleRate: 16000 });
         } catch (err) {
           if (box) box.innerHTML = `<span style="color:#f66">Decode error: ${err.message}</span>`;
         }
