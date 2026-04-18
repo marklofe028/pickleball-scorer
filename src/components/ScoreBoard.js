@@ -20,6 +20,9 @@ export class ScoreBoard {
             <span class="app-header__title">Pickle Score</span>
           </div>
           <div style="display:flex;gap:6px">
+            <button class="btn-icon" data-action="showDiag" aria-label="Diagnostics" title="Mic diagnostics">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07"/></svg>
+            </button>
             <button class="btn-icon" data-action="showVcmd" aria-label="Voice commands help" title="Voice commands" style="font-size:1rem;font-weight:700;color:var(--green)">?</button>
             <button class="btn-icon" data-action="history" aria-label="History" title="History">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
@@ -132,6 +135,44 @@ export class ScoreBoard {
 
         <!-- Listening pulse ring -->
         <div class="listening-ring" id="listeningRing" style="display:none"></div>
+
+        <!-- Diagnostics overlay -->
+        <div class="vcmd-overlay" id="diagOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Mic diagnostics">
+          <div class="vcmd-sheet">
+            <div class="vcmd-sheet__header">
+              <div class="vcmd-sheet__title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+                Mic Diagnostics
+              </div>
+              <button class="vcmd-close" data-action="closeDiag" aria-label="Close">✕</button>
+            </div>
+
+            <div class="diag-row">
+              <span class="diag-label">Whisper model</span>
+              <span class="diag-value" id="diagModelStatus">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Mic permission</span>
+              <span class="diag-value" id="diagMicPerm">—</span>
+            </div>
+
+            <div class="diag-level-wrap">
+              <div class="diag-level-label">Audio level</div>
+              <div class="diag-level-bar-bg">
+                <div class="diag-level-bar" id="diagLevelBar" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div class="diag-transcript-box" id="diagTranscriptBox">
+              <span class="diag-transcript-placeholder">Transcript will appear here…</span>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn-primary" id="diagTestBtn" data-action="diagTest" style="flex:1;padding:10px">▶ Start Test</button>
+            </div>
+            <p class="form-hint" style="text-align:center;margin-top:8px" id="diagHint">Tap Start, then speak anything into the mic.</p>
+          </div>
+        </div>
       </div>
     `;
 
@@ -212,6 +253,16 @@ export class ScoreBoard {
       listenLabel.textContent = 'Listen';
     }
     btnListen.disabled = modelLoading;
+
+    // Diag panel — model status
+    const diagStatus = this.container.querySelector('#diagModelStatus');
+    if (diagStatus && whisperModel) {
+      const { state, progress } = whisperModel;
+      if (state === 'ready') { diagStatus.textContent = 'ready ✓'; diagStatus.style.color = 'var(--green)'; }
+      else if (state === 'loading') { diagStatus.textContent = progress ? `loading ${progress}%` : 'loading…'; diagStatus.style.color = 'var(--text-dim)'; }
+      else if (state === 'error') { diagStatus.textContent = 'error ✗'; diagStatus.style.color = '#f66'; }
+      else { diagStatus.textContent = 'idle'; diagStatus.style.color = 'var(--text-dim)'; }
+    }
 
     // Continuous mode button
     const btnContinuous = this.container.querySelector('#btnContinuous');
@@ -314,8 +365,144 @@ export class ScoreBoard {
           if (ol) ol.style.display = 'none';
           break;
         }
+        case 'showDiag': {
+          const ol = this.container.querySelector('#diagOverlay');
+          if (ol) ol.style.display = 'flex';
+          this._diagCheckPerm();
+          break;
+        }
+        case 'closeDiag': {
+          const ol = this.container.querySelector('#diagOverlay');
+          if (ol) ol.style.display = 'none';
+          this._diagStop();
+          break;
+        }
+        case 'diagTest':
+          this._diagToggle();
+          break;
       }
     };
     this.container.addEventListener('click', this._clickHandler);
+  }
+
+  // ── Diagnostics ───────────────────────────────────────────────────────────
+
+  _diagCheckPerm() {
+    navigator.permissions?.query({ name: 'microphone' }).then(r => {
+      const el = this.container.querySelector('#diagMicPerm');
+      if (el) {
+        el.textContent = r.state;
+        el.style.color = r.state === 'granted' ? 'var(--green)' : r.state === 'denied' ? '#f66' : 'var(--text-dim)';
+      }
+    }).catch(() => {
+      const el = this.container.querySelector('#diagMicPerm');
+      if (el) el.textContent = 'unknown';
+    });
+  }
+
+  _diagToggle() {
+    if (this._diagStream) { this._diagStop(); return; }
+    this._diagStart();
+  }
+
+  async _diagStart() {
+    const btn = this.container.querySelector('#diagTestBtn');
+    const hint = this.container.querySelector('#diagHint');
+    const box = this.container.querySelector('#diagTranscriptBox');
+    const bar = this.container.querySelector('#diagLevelBar');
+
+    try {
+      this._diagStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+      // Update mic permission display
+      const permEl = this.container.querySelector('#diagMicPerm');
+      if (permEl) { permEl.textContent = 'granted'; permEl.style.color = 'var(--green)'; }
+
+      // Audio level meter
+      this._diagAudioCtx = new AudioContext();
+      const source = this._diagAudioCtx.createMediaStreamSource(this._diagStream);
+      const analyser = this._diagAudioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+
+      this._diagAnimFrame = null;
+      const tick = () => {
+        if (!this._diagStream) return;
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
+        const rms = Math.sqrt(sum / buf.length);
+        if (bar) bar.style.width = Math.min(100, rms * 400) + '%';
+        this._diagAnimFrame = requestAnimationFrame(tick);
+      };
+      tick();
+
+      // Record + transcribe via Whisper worker
+      const chunks = [];
+      this._diagRecorder = new MediaRecorder(this._diagStream);
+      this._diagRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      this._diagRecorder.onstop = async () => {
+        if (!chunks.length) return;
+        try {
+          const blob = new Blob(chunks, { type: this._diagRecorder.mimeType });
+          const arrayBuffer = await blob.arrayBuffer();
+          const decodeCtx = new AudioContext();
+          const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
+          decodeCtx.close();
+          if (hint) hint.textContent = 'Processing with Whisper…';
+
+          // Reuse the app's voice worker via a one-shot approach
+          const workerUrl = new URL('../modules/whisper-worker.js', import.meta.url);
+          if (!this._diagWorker) {
+            this._diagWorker = new Worker(workerUrl, { type: 'module' });
+            this._diagWorker.postMessage({ type: 'load' });
+          }
+          const audio = decoded.getChannelData(0);
+          this._diagWorker.onmessage = ({ data }) => {
+            if (data.type === 'transcript') {
+              if (box) box.innerHTML = `<span style="color:var(--green);font-size:1rem">"${data.text || '(nothing heard)'}"</span>`;
+              if (hint) hint.textContent = 'Done. Tap Start to test again.';
+            } else if (data.type === 'error') {
+              if (box) box.innerHTML = `<span style="color:#f66">Error: ${data.message}</span>`;
+              if (hint) hint.textContent = 'Whisper error — see above.';
+            }
+          };
+          this._diagWorker.postMessage({ type: 'transcribe', audio, sampleRate: decoded.sampleRate });
+        } catch (err) {
+          if (box) box.innerHTML = `<span style="color:#f66">Decode error: ${err.message}</span>`;
+        }
+        if (btn) { btn.textContent = '▶ Start Test'; }
+        this._diagStream?.getTracks().forEach(t => t.stop());
+        this._diagStream = null;
+        cancelAnimationFrame(this._diagAnimFrame);
+        if (bar) bar.style.width = '0%';
+      };
+
+      this._diagRecorder.start();
+      if (btn) btn.textContent = '⏹ Stop & Transcribe';
+      if (hint) hint.textContent = 'Recording… tap Stop when done speaking.';
+      if (box) box.innerHTML = '<span class="diag-transcript-placeholder">Waiting for audio…</span>';
+
+    } catch (err) {
+      const permEl = this.container.querySelector('#diagMicPerm');
+      if (permEl) { permEl.textContent = 'denied'; permEl.style.color = '#f66'; }
+      if (hint) hint.textContent = `Mic error: ${err.message}`;
+    }
+  }
+
+  _diagStop() {
+    if (this._diagRecorder?.state === 'recording') this._diagRecorder.stop();
+    else {
+      this._diagStream?.getTracks().forEach(t => t.stop());
+      this._diagStream = null;
+    }
+    cancelAnimationFrame(this._diagAnimFrame);
+    this._diagAudioCtx?.close().catch(() => {});
+    this._diagAudioCtx = null;
+    const bar = this.container.querySelector('#diagLevelBar');
+    if (bar) bar.style.width = '0%';
+    const btn = this.container.querySelector('#diagTestBtn');
+    if (btn) btn.textContent = '▶ Start Test';
   }
 }

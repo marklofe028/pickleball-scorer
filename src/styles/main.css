@@ -923,6 +923,45 @@ html, body {
 
 .vcmd-note strong { color: var(--green); }
 
+/* ─── Diagnostics panel ──────────────────────────────────────────────────── */
+.diag-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.diag-label { color: var(--text-muted); }
+.diag-value { font-weight: 600; color: var(--text); }
+
+.diag-level-wrap { margin-top: 4px; }
+.diag-level-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; }
+.diag-level-bar-bg {
+  background: var(--surface);
+  border-radius: 4px;
+  height: 12px;
+  overflow: hidden;
+}
+.diag-level-bar {
+  height: 100%;
+  background: var(--green);
+  border-radius: 4px;
+  transition: width 0.05s linear;
+}
+
+.diag-transcript-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  min-height: 56px;
+  font-size: 0.9rem;
+  color: var(--text);
+  word-break: break-word;
+}
+.diag-transcript-placeholder { color: var(--text-dim); font-style: italic; }
+
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
