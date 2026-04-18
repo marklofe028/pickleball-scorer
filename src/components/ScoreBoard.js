@@ -475,18 +475,35 @@ export class ScoreBoard {
           const workerUrl = new URL('../modules/whisper-worker.js', import.meta.url);
           if (!this._diagWorker) {
             this._diagWorker = new Worker(workerUrl, { type: 'module' });
+            this._diagWorkerReady = false;
             this._diagWorker.postMessage({ type: 'load' });
           }
-          this._diagWorker.onmessage = ({ data }) => {
-            if (data.type === 'transcript') {
-              if (box) box.innerHTML = `<span style="color:var(--green);font-size:1rem">"${data.text || '(nothing heard)'}"</span>`;
-              if (hint) hint.textContent = 'Done. Tap Start to test again.';
-            } else if (data.type === 'error') {
-              if (box) box.innerHTML = `<span style="color:#f66">Error: ${data.message}</span>`;
-              if (hint) hint.textContent = 'Whisper error — see above.';
-            }
+
+          const sendTranscribe = () => {
+            this._diagWorker.onmessage = ({ data }) => {
+              if (data.type === 'transcript') {
+                if (box) box.innerHTML = `<span style="color:var(--green);font-size:1rem">"${data.text || '(nothing heard)'}"</span>`;
+                if (hint) hint.textContent = 'Done. Tap Start to test again.';
+              } else if (data.type === 'error') {
+                if (box) box.innerHTML = `<span style="color:#f66">Error: ${data.message}</span>`;
+                if (hint) hint.textContent = 'Whisper error — see above.';
+              }
+            };
+            this._diagWorker.postMessage({ type: 'transcribe', audio, sampleRate: 16000 });
           };
-          this._diagWorker.postMessage({ type: 'transcribe', audio, sampleRate: 16000 });
+
+          if (this._diagWorkerReady) {
+            sendTranscribe();
+          } else {
+            if (hint) hint.textContent = 'Waiting for model to load…';
+            this._diagWorker.onmessage = ({ data }) => {
+              if (data.type === 'ready') { this._diagWorkerReady = true; sendTranscribe(); }
+              else if (data.type === 'error') {
+                if (box) box.innerHTML = `<span style="color:#f66">Model error: ${data.message}</span>`;
+                if (hint) hint.textContent = 'Could not load Whisper model.';
+              }
+            };
+          }
         } catch (err) {
           if (box) box.innerHTML = `<span style="color:#f66">Decode error: ${err.message}</span>`;
         }
