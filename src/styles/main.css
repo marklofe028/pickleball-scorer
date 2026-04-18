@@ -301,10 +301,7 @@ html, body {
   gap: 8px;
   width: 100%;
   max-width: 480px;
-  /* Occupy remaining space between header+footer (~180px) and meta/gap (~44px) */
-  height: calc(100dvh - 224px);
-  min-height: 300px;
-  max-height: 560px;
+  height: clamp(200px, 50vw, 280px);
 }
 
 /* ─── Team Card ──────────────────────────────────────────────────────────── */

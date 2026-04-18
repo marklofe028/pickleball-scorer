@@ -16,7 +16,7 @@ export function createInitialState(config = {}) {
     teamBName: config.teamBName || 'Team B',
     teamAScore: 0,
     teamBScore: 0,
-    servingTeam: 'A',
+    servingTeam: config.servingFirst || 'A',
     // Doubles traditional: start at server 2 (the initial-serve rule).
     // All other modes: 0 = N/A.
     serverNumber: isTraditionalDoubles ? 2 : 0,

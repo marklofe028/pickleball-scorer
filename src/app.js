@@ -18,6 +18,7 @@ const DEFAULT_STATE = {
     gameMode: 'doubles',
     scoringType: 'traditional',
     gameTarget: 11,
+    servingFirst: 'A',
   },
 };
 
@@ -114,36 +115,45 @@ class App {
         }
         if (this.state.voiceListening) {
           this.voice.stopListening();
+          showToast('🎤 Voice off');
         } else {
-          this.voice.setContinuous(false);
           this.voice.startListening();
+          showToast('🎤 Listening — speak a command');
         }
         break;
       }
 
-      case 'TOGGLE_CONTINUOUS': {
-        if (!this.voice) this._initVoice();
-        if (!this.voice?.isSupported) {
-          showToast('Voice not supported in this browser');
-          return;
-        }
-        const next = !this.state.voiceContinuous;
-        this._setState({ voiceContinuous: next });
-        this.voice.setContinuous(next);
-        if (next) {
-          this.voice.startListening();
-          showToast('🎤 Always-on voice enabled');
-        } else {
-          this.voice.stopListening();
-          showToast('🎤 Always-on voice disabled');
-        }
+      // kept for backward compat — same as TAP_LISTEN now
+      case 'TOGGLE_CONTINUOUS':
+        this.dispatch({ type: 'TAP_LISTEN' });
         break;
-      }
 
       case 'SPEAK_SCORE': {
         const { game } = this.state;
         if (!this.voice) this._initVoice();
         if (game) this.voice?.speak(getScoreAnnouncement(game));
+        break;
+      }
+
+      case 'SIDE_OUT': {
+        const { game } = this.state;
+        if (!game || game.gameOver) return;
+        const receivingTeam = game.servingTeam === 'A' ? 'B' : 'A';
+        this.undoStack.push(game);
+        const next = rallyWon(game, receivingTeam);
+        this._setState({ game: next });
+        if (this.voice) {
+          if (next.servingTeam !== game.servingTeam) {
+            const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
+            const srv = (next.gameMode === 'doubles' && next.scoringType === 'traditional')
+              ? `, Server ${next.serverNumber}` : '';
+            this.voice.speak(`Side out! ${name} serving${srv}.`);
+          } else {
+            const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
+            this.voice.speak(`Server ${next.serverNumber}. ${name} still serving.`);
+          }
+        }
+        showToast('🎤 Side-out');
         break;
       }
 
@@ -164,6 +174,7 @@ class App {
     const { view } = this.state;
 
     if (this.currentView !== view) {
+      this.currentComponent?.destroy?.();
       this.root.innerHTML = '';
       switch (view) {
         case 'setup':   this.currentComponent = new SetupScreen(this.root, this.dispatch); break;
@@ -206,6 +217,7 @@ class App {
       case 'UNDO':       showToast('🎤 Undo'); this.dispatch({ type: 'UNDO' }); break;
       case 'NEW_GAME':   showToast('🎤 New game'); this.dispatch({ type: 'CONFIRM_NEW_GAME' }); break;
       case 'READ_SCORE': this.dispatch({ type: 'SPEAK_SCORE' }); break;
+      case 'SIDE_OUT':   this.dispatch({ type: 'SIDE_OUT' }); break;
       case 'WHO_SERVES': {
         const { game } = this.state;
         if (game) {

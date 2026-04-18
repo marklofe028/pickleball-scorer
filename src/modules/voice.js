@@ -64,10 +64,12 @@ export class VoiceEngine {
     };
 
     this.recognition.onend = () => {
-      if (this.continuous && this.isListening) {
-        try { this.recognition.start(); } catch { /* already started */ }
+      // Always auto-restart while listening — more reliable than continuous:true
+      if (this.isListening) {
+        setTimeout(() => {
+          try { this.recognition.start(); } catch { /* already restarting */ }
+        }, 120);
       } else {
-        this.isListening = false;
         this.onListeningChange(false);
       }
     };
@@ -86,6 +88,7 @@ export class VoiceEngine {
     // --- game management ---
     if (/\bnew\s*game\b|\breset\b/.test(t)) return { type: 'NEW_GAME' };
     if (/\bundo\b|\btake\s*back\b/.test(t)) return { type: 'UNDO' };
+    if (/\bside.?out\b|\bchange\s*serv/.test(t)) return { type: 'SIDE_OUT' };
     if (/who.{0,10}serv/.test(t) || /\bserving\b/.test(t)) return { type: 'WHO_SERVES' };
 
     // --- point detection ---
@@ -130,8 +133,7 @@ export class VoiceEngine {
   }
 
   setContinuous(enabled) {
-    this.continuous = enabled;
-    if (!enabled && this.isListening) this.stopListening();
+    // no-op — auto-restart is always on when listening
   }
 
   speak(text) {

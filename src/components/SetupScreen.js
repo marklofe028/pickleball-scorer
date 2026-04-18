@@ -64,6 +64,14 @@ export class SetupScreen {
             <p class="form-hint" id="scoringHint"></p>
           </section>
 
+          <section class="form-section">
+            <label class="form-label">First Server</label>
+            <div class="toggle-group" id="firstServerGroup">
+              <button class="toggle-btn active" data-value="A" id="firstServerA">Team A</button>
+              <button class="toggle-btn" data-value="B" id="firstServerB">Team B</button>
+            </div>
+          </section>
+
           <button class="btn-primary btn-start" data-action="start">
             ▶ &nbsp;Start Game
           </button>
@@ -85,6 +93,7 @@ export class SetupScreen {
                   <tr><td class="voice-cmd-table__say">"score"</td><td>Reads current score aloud</td></tr>
                   <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Adds a point to that team</td></tr>
                   <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B point</td></tr>
+                  <tr><td class="voice-cmd-table__say">"side out"</td><td>Receiving team wins rally — rotates or changes serve</td></tr>
                   <tr><td class="voice-cmd-table__say">"undo"</td><td>Reverses last rally</td></tr>
                   <tr><td class="voice-cmd-table__say">"who's serving"</td><td>Announces serving team</td></tr>
                   <tr><td class="voice-cmd-table__say">"new game"</td><td>Starts a new game</td></tr>
@@ -117,7 +126,16 @@ export class SetupScreen {
     this._setActive('gameModeGroup', settings.gameMode || 'doubles');
     this._setActive('gameTargetGroup', String(settings.gameTarget || 11));
     this._setActive('scoringTypeGroup', settings.scoringType || 'traditional');
+    this._setActive('firstServerGroup', settings.servingFirst || 'A');
     this._updateHint(settings.scoringType || 'traditional', settings.gameMode || 'doubles');
+
+    // Keep first-server labels in sync with team names
+    const btnA = this.container.querySelector('#firstServerA');
+    const btnB = this.container.querySelector('#firstServerB');
+    const nameA = this.container.querySelector('#teamA')?.value.trim() || settings.teamAName || 'Team A';
+    const nameB = this.container.querySelector('#teamB')?.value.trim() || settings.teamBName || 'Team B';
+    if (btnA) btnA.textContent = nameA || 'Team A';
+    if (btnB) btnB.textContent = nameB || 'Team B';
   }
 
   _setActive(groupId, value) {
@@ -158,7 +176,7 @@ export class SetupScreen {
       }
 
       const action = e.target.closest('[data-action]')?.dataset.action;
-      if (action === 'start') this._handleStart();
+      if (action === 'start') { this._handleStart(); return; }
       if (action === 'history') this.dispatch({ type: 'NAVIGATE', view: 'history' });
       if (action === 'toggleVoiceHelp') {
         const body = this.container.querySelector('#voiceHelpBody');
@@ -169,6 +187,16 @@ export class SetupScreen {
         btn.classList.toggle('voice-help__toggle--open', !open);
       }
     });
+
+    // Update first-server button labels as team names are typed
+    this.container.querySelector('#teamA')?.addEventListener('input', (e) => {
+      const btn = this.container.querySelector('#firstServerA');
+      if (btn) btn.textContent = e.target.value.trim() || 'Team A';
+    });
+    this.container.querySelector('#teamB')?.addEventListener('input', (e) => {
+      const btn = this.container.querySelector('#firstServerB');
+      if (btn) btn.textContent = e.target.value.trim() || 'Team B';
+    });
   }
 
   _handleStart() {
@@ -177,7 +205,8 @@ export class SetupScreen {
     const gameMode = this.container.querySelector('#gameModeGroup .toggle-btn.active')?.dataset.value || 'doubles';
     const gameTarget = parseInt(this.container.querySelector('#gameTargetGroup .toggle-btn.active')?.dataset.value || '11', 10);
     const scoringType = this.container.querySelector('#scoringTypeGroup .toggle-btn.active')?.dataset.value || 'traditional';
+    const servingFirst = this.container.querySelector('#firstServerGroup .toggle-btn.active')?.dataset.value || 'A';
 
-    this.dispatch({ type: 'START_GAME', config: { teamAName, teamBName, gameMode, gameTarget, scoringType } });
+    this.dispatch({ type: 'START_GAME', config: { teamAName, teamBName, gameMode, gameTarget, scoringType, servingFirst } });
   }
 }

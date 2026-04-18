@@ -82,9 +82,9 @@ export class ScoreBoard {
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
             Score
           </button>
-          <button class="footer-btn footer-btn--continuous" data-action="toggleContinuous" id="btnContinuous" aria-label="Toggle always-on voice">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-            <span id="continuousLabel">Always On</span>
+          <button class="footer-btn" data-action="showVcmd" aria-label="Voice commands reference" style="color:var(--green);border-color:var(--green-dim)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Commands
           </button>
         </footer>
 
@@ -107,6 +107,7 @@ export class ScoreBoard {
                 <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Add a point to that team</td></tr>
                 <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B</td></tr>
                 <tr><td class="voice-cmd-table__say">"point one" / "point two"</td><td>Team one or two</td></tr>
+                <tr><td class="voice-cmd-table__say">"side out"</td><td>Receiving team wins rally — rotates or changes serve</td></tr>
                 <tr><td class="voice-cmd-table__say">"undo"</td><td>Reverse last rally</td></tr>
                 <tr><td class="voice-cmd-table__say">"who's serving"</td><td>Announce serving team</td></tr>
                 <tr><td class="voice-cmd-table__say">"new game"</td><td>Start a new game</td></tr>
@@ -275,8 +276,14 @@ export class ScoreBoard {
     if (el) el[prop] = val;
   }
 
+  destroy() {
+    if (this._clickHandler) {
+      this.container.removeEventListener('click', this._clickHandler);
+    }
+  }
+
   _bindEvents() {
-    this.container.addEventListener('click', (e) => {
+    this._clickHandler = (e) => {
       const team = e.target.closest('[data-team]')?.dataset.team;
       if (team) {
         navigator.vibrate?.(40);
@@ -303,6 +310,7 @@ export class ScoreBoard {
           break;
         }
       }
-    });
+    };
+    this.container.addEventListener('click', this._clickHandler);
   }
 }
