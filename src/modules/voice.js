@@ -277,7 +277,10 @@ export class WhisperEngine {
   async _record() {
     if (!this.isListening) return;
     try {
-      this._stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this._stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
       this._audioCtx = new AudioContext();
 
       const source = this._audioCtx.createMediaStreamSource(this._stream);

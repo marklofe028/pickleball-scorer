@@ -431,7 +431,10 @@ export class ScoreBoard {
     const bar = this.container.querySelector('#diagLevelBar');
 
     try {
-      this._diagStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this._diagStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
 
       // Update mic permission display
       const permEl = this.container.querySelector('#diagMicPerm');
@@ -470,6 +473,14 @@ export class ScoreBoard {
 
           // Resample to 16 kHz independent Float32Array before sending to worker
           const audio = await this._resampleTo16k(arrayBuffer);
+          const durationSec = (audio.length / 16000).toFixed(2);
+          if (hint) hint.textContent = `Processing ${durationSec}s of audio with Whisper…`;
+
+          if (audio.length < 3200) { // < 0.2s — too short to be real speech
+            if (box) box.innerHTML = `<span style="color:#f66">Audio too short (${durationSec}s) — speak longer before stopping</span>`;
+            if (btn) btn.textContent = '▶ Start Test';
+            return;
+          }
 
           // Reuse the app's voice worker via a one-shot approach
           const workerUrl = new URL('../modules/whisper-worker.js', import.meta.url);
