@@ -306,8 +306,9 @@ export class WhisperEngine {
       };
 
       this._recorder.start(100);
+      const recordingStart = Date.now();
 
-      // Silence detection — stop after 800 ms quiet following detected speech
+      // Silence detection — stop after 1200 ms quiet following detected speech
       const bufData = new Uint8Array(analyser.frequencyBinCount);
       let speechStarted = false;
       let silenceTimer = null;
@@ -322,14 +323,19 @@ export class WhisperEngine {
         }
         const rms = Math.sqrt(sum / bufData.length);
 
-        if (rms > 0.015) {
+        if (rms > 0.01) {
           speechStarted = true;
           clearTimeout(silenceTimer);
           silenceTimer = null;
         } else if (speechStarted && !silenceTimer) {
           silenceTimer = setTimeout(() => {
-            if (this._recorder?.state === 'recording') this._recorder.stop();
-          }, 800);
+            // Ensure at least 1s of audio so Whisper has enough context
+            const elapsed = Date.now() - recordingStart;
+            const remaining = Math.max(0, 1000 - elapsed);
+            setTimeout(() => {
+              if (this._recorder?.state === 'recording') this._recorder.stop();
+            }, remaining);
+          }, 1200);
         }
         requestAnimationFrame(tick);
       };

@@ -12,7 +12,7 @@ self.onmessage = async ({ data }) => {
       try {
         asr = await pipeline(
           'automatic-speech-recognition',
-          'Xenova/whisper-tiny.en',
+          'Xenova/whisper-base.en',
           {
             quantized: true,
             progress_callback: (p) => {
@@ -35,6 +35,8 @@ self.onmessage = async ({ data }) => {
           sampling_rate: data.sampleRate,
           language: 'english',
           task: 'transcribe',
+          // Bias toward pickleball scoring vocabulary
+          initial_prompt: 'Pickleball score commands: point team A, point team B, side out, undo, new game, score, who serves.',
         });
         self.postMessage({ type: 'transcript', text: result.text.trim() });
       } catch (e) {

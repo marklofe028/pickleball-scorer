@@ -70,6 +70,16 @@ export class ScoreBoard {
             <span class="voice-transcript__icon">🎤</span>
             <span id="voiceTranscriptText"></span>
           </div>
+
+          <!-- Voice command pending confirmation -->
+          <div class="voice-pending" id="voicePending" style="display:none" role="alertdialog" aria-label="Confirm voice command">
+            <div class="voice-pending__label">Side-out detected — confirm?</div>
+            <div class="voice-pending__actions">
+              <button class="voice-pending__confirm" data-action="confirmVoicePending">Confirm</button>
+              <button class="voice-pending__cancel" data-action="cancelVoicePending">Cancel</button>
+            </div>
+            <div class="voice-pending__bar"><div class="voice-pending__bar-fill" id="voicePendingBar"></div></div>
+          </div>
         </main>
 
         <footer class="scoreboard-footer">
@@ -180,7 +190,21 @@ export class ScoreBoard {
   }
 
   update(state) {
-    const { game, voiceListening, voiceContinuous, whisperModel } = state;
+    const { game, voiceListening, voiceContinuous, whisperModel, voicePending } = state;
+
+    // Voice pending confirmation banner
+    const pendingEl = this.container.querySelector('#voicePending');
+    if (pendingEl) {
+      if (voicePending) {
+        pendingEl.style.display = 'flex';
+        const remaining = Math.max(0, voicePending.expiresAt - Date.now());
+        const pct = (remaining / 5000) * 100;
+        const barFill = this.container.querySelector('#voicePendingBar');
+        if (barFill) barFill.style.width = `${pct}%`;
+      } else {
+        pendingEl.style.display = 'none';
+      }
+    }
     if (!game) return;
 
     const {
@@ -379,6 +403,12 @@ export class ScoreBoard {
         }
         case 'diagTest':
           this._diagToggle();
+          break;
+        case 'confirmVoicePending':
+          this.dispatch({ type: 'CONFIRM_VOICE_PENDING' });
+          break;
+        case 'cancelVoicePending':
+          this.dispatch({ type: 'CANCEL_VOICE_PENDING' });
           break;
       }
     };

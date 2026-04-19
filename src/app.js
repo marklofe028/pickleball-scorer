@@ -13,6 +13,7 @@ const DEFAULT_STATE = {
   voiceListening: false,
   voiceContinuous: false,
   whisperModel: { state: 'idle', progress: 0 },
+  voicePending: null,   // { type, expiresAt } — awaiting voice confirmation
   settings: {
     teamAName: 'Team A',
     teamBName: 'Team B',
@@ -150,7 +151,7 @@ class App {
         const receivingTeam = game.servingTeam === 'A' ? 'B' : 'A';
         this.undoStack.push(game);
         const next = rallyWon(game, receivingTeam);
-        this._setState({ game: next });
+        this._setState({ game: next, voicePending: null });
         if (this.voice) {
           if (next.servingTeam !== game.servingTeam) {
             const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
@@ -162,9 +163,26 @@ class App {
             this.voice.speak(`Server ${next.serverNumber}. ${name} still serving.`);
           }
         }
-        showToast('🎤 Side-out');
+        showToast('Side-out confirmed');
         break;
       }
+
+      case 'CONFIRM_VOICE_PENDING': {
+        const { voicePending } = this.state;
+        if (!voicePending || Date.now() > voicePending.expiresAt) {
+          this._setState({ voicePending: null });
+          return;
+        }
+        clearTimeout(this._pendingTimer);
+        this.dispatch({ type: voicePending.type });
+        break;
+      }
+
+      case 'CANCEL_VOICE_PENDING':
+        clearTimeout(this._pendingTimer);
+        this._setState({ voicePending: null });
+        showToast('Side-out cancelled');
+        break;
 
       case 'CLEAR_HISTORY':
         this._setState({ gameHistory: [] });
@@ -201,6 +219,20 @@ class App {
     const b = teamBName || this.state.settings.teamBName || 'Team B';
 
     if (!this.voice) {
+      // Warn about the one-time 145 MB download if not already cached
+      const alreadyCached = localStorage.getItem('whisper-base-ready');
+      if (!alreadyCached) {
+        const ok = confirm(
+          'Voice recognition requires a one-time download of ~145 MB.\n\n' +
+          'After downloading, it works fully offline — no internet needed.\n\n' +
+          'Download now? (Best done on Wi-Fi)'
+        );
+        if (!ok) {
+          this._setState({ whisperModel: { state: 'idle', progress: 0 } });
+          return;
+        }
+      }
+
       this.voice = new WhisperEngine({
         teamAName: a,
         teamBName: b,
@@ -214,6 +246,9 @@ class App {
           this._setState({ voiceListening: listening });
         },
         onModelStatus: (status) => {
+          if (status.state === 'ready') {
+            localStorage.setItem('whisper-base-ready', '1');
+          }
           this._setState({ whisperModel: { state: status.state, progress: status.progress ?? 0 } });
         },
       });
@@ -229,7 +264,19 @@ class App {
       case 'UNDO':       showToast('🎤 Undo'); this.dispatch({ type: 'UNDO' }); break;
       case 'NEW_GAME':   showToast('🎤 New game'); this.dispatch({ type: 'CONFIRM_NEW_GAME' }); break;
       case 'READ_SCORE': this.dispatch({ type: 'SPEAK_SCORE' }); break;
-      case 'SIDE_OUT':   this.dispatch({ type: 'SIDE_OUT' }); break;
+      case 'SIDE_OUT': {
+        // Voice-triggered side-out requires confirmation — accidental triggers are common
+        const CONFIRM_MS = 5000;
+        clearTimeout(this._pendingTimer);
+        this._setState({
+          voicePending: { type: 'SIDE_OUT', expiresAt: Date.now() + CONFIRM_MS },
+        });
+        this._pendingTimer = setTimeout(() => {
+          this._setState({ voicePending: null });
+          showToast('Side-out timed out');
+        }, CONFIRM_MS);
+        break;
+      }
       case 'WHO_SERVES': {
         const { game } = this.state;
         if (game) {
@@ -251,19 +298,8 @@ class App {
 
   _watchOnline() {
     const update = () => this._setState({ online: navigator.onLine });
-    window.addEventListener('online', () => {
-      update();
-      showToast('Back online — voice available');
-    });
-    window.addEventListener('offline', () => {
-      update();
-      if (this.state.voiceListening) {
-        this.voice?.stopListening();
-        this._setState({ voiceListening: false });
-      }
-      showToast('Offline — voice unavailable, tap to score');
-    });
-    // Set initial value without triggering a render cycle
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
     this.state.online = navigator.onLine;
   }
 
