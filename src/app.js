@@ -264,16 +264,23 @@ class App {
       case 'UNDO':       showToast('🎤 Undo'); this.dispatch({ type: 'UNDO' }); break;
       case 'NEW_GAME':   showToast('🎤 New game'); this.dispatch({ type: 'CONFIRM_NEW_GAME' }); break;
       case 'READ_SCORE': this.dispatch({ type: 'SPEAK_SCORE' }); break;
+      case 'CONFIRM':
+        if (this.state.voicePending) this.dispatch({ type: 'CONFIRM_VOICE_PENDING' });
+        break;
+      case 'CANCEL':
+        if (this.state.voicePending) this.dispatch({ type: 'CANCEL_VOICE_PENDING' });
+        break;
       case 'SIDE_OUT': {
         // Voice-triggered side-out requires confirmation — accidental triggers are common
-        const CONFIRM_MS = 5000;
+        const CONFIRM_MS = 10000; // TTS takes ~2s to speak the prompt, leave 8s to respond
         clearTimeout(this._pendingTimer);
         this._setState({
           voicePending: { type: 'SIDE_OUT', expiresAt: Date.now() + CONFIRM_MS },
         });
+        // Speak the prompt so players hear it without looking at the screen
+        this.voice?.speak('Side out? Say confirm, or tap Confirm to proceed.');
         this._pendingTimer = setTimeout(() => {
           this._setState({ voicePending: null });
-          showToast('Side-out timed out');
         }, CONFIRM_MS);
         break;
       }

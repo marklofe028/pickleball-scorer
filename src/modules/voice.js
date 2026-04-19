@@ -122,6 +122,10 @@ export class VoiceEngine {
       return { type: 'READ_SCORE' };
     }
 
+    // --- confirmation (must check before point detection) ---
+    if (/^\bconfirm\b$|^yes\b|^yeah\b/.test(t)) return { type: 'CONFIRM' };
+    if (/^\bcancel\b$|^no\b|^nope\b/.test(t)) return { type: 'CANCEL' };
+
     // --- game management ---
     if (/\bnew\s*game\b|\breset\b/.test(t)) return { type: 'NEW_GAME' };
     if (/\bundo\b|\btake\s*back\b/.test(t)) return { type: 'UNDO' };
@@ -392,6 +396,9 @@ export class WhisperEngine {
     if (/^score$/.test(t) || /what'?s? (the )?score/.test(t) || /read score|current score/.test(t)) {
       return { type: 'READ_SCORE' };
     }
+    if (/^\bconfirm\b$|^yes\b|^yeah\b/.test(t)) return { type: 'CONFIRM' };
+    if (/^\bcancel\b$|^no\b|^nope\b/.test(t)) return { type: 'CANCEL' };
+
     if (/\bnew\s*game\b|\breset\b/.test(t)) return { type: 'NEW_GAME' };
     if (/\bundo\b|\btake\s*back\b/.test(t)) return { type: 'UNDO' };
     if (/\bside.?out\b|\bchange\s*serv/.test(t)) return { type: 'SIDE_OUT' };

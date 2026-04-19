@@ -198,7 +198,7 @@ export class ScoreBoard {
       if (voicePending) {
         pendingEl.style.display = 'flex';
         const remaining = Math.max(0, voicePending.expiresAt - Date.now());
-        const pct = (remaining / 5000) * 100;
+        const pct = (remaining / 10000) * 100;
         const barFill = this.container.querySelector('#voicePendingBar');
         if (barFill) barFill.style.width = `${pct}%`;
       } else {
