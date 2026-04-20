@@ -279,17 +279,19 @@ class App {
     }
   }
 
-  // TTS independent of Whisper — always works, fixes Chrome speechSynthesis bugs
+  // TTS — mutes the mic while speaking to prevent feedback loops
   _speak(text) {
     const synth = window.speechSynthesis;
     if (!synth) return;
     synth.cancel();
-    // Chrome bug: synthesis silently fails when paused (e.g. after tab switch)
-    if (synth.paused) synth.resume();
+    if (synth.paused) synth.resume(); // Chrome bug: silently fails when paused
+    this.voice?.pauseForSpeech();
     const utt = new SpeechSynthesisUtterance(text);
     utt.rate = 0.92;
     utt.pitch = 1.0;
     utt.volume = 1.0;
+    utt.onend = () => this.voice?.resumeAfterSpeech();
+    utt.onerror = () => this.voice?.resumeAfterSpeech();
     synth.speak(utt);
   }
 

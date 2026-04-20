@@ -45,9 +45,8 @@ export class VoiceEngine {
     this.onListeningChange = onListeningChange || (() => {});
 
     this.recognition = null;
-    this.synthesis = window.speechSynthesis || null;
     this.isListening = false;
-    this.continuous = false;
+    this._speaking = false; // true while TTS is playing — suppresses mic restart
 
     this._initRecognition();
   }
@@ -102,14 +101,31 @@ export class VoiceEngine {
     };
 
     this.recognition.onend = () => {
-      if (this.isListening) {
+      if (this.isListening && !this._speaking) {
         setTimeout(() => {
           try { this.recognition.start(); } catch { /* already restarting */ }
         }, 150);
-      } else {
+      } else if (!this.isListening) {
         this.onListeningChange(false);
       }
+      // If _speaking, don't restart — resumeAfterSpeech() will do it
     };
+  }
+
+  /** Pause mic while TTS is playing to prevent feedback loops. */
+  pauseForSpeech() {
+    this._speaking = true;
+    try { this.recognition?.abort(); } catch {}
+  }
+
+  /** Resume mic after TTS finishes. */
+  resumeAfterSpeech() {
+    this._speaking = false;
+    if (this.isListening) {
+      setTimeout(() => {
+        try { this.recognition?.start(); } catch {}
+      }, 400);
+    }
   }
 
   /** Parse a lowercase transcript into a command object or null. */
@@ -117,33 +133,35 @@ export class VoiceEngine {
     const teamA = this.teamAName;
     const teamB = this.teamBName;
 
-    // --- score reading (must check before point detection) ---
+    // --- score reading ---
     if (/^score$/.test(t) || /what'?s? (the )?score/.test(t) || /read score|current score/.test(t)) {
       return { type: 'READ_SCORE' };
     }
 
-    // --- confirmation (must check before point detection) ---
-    if (/^\bconfirm\b$|^yes\b|^yeah\b/.test(t)) return { type: 'CONFIRM' };
-    if (/^\bcancel\b$|^no\b|^nope\b/.test(t)) return { type: 'CANCEL' };
+    // --- confirmation ---
+    if (/^confirm$|^yes$|^yeah$/.test(t)) return { type: 'CONFIRM' };
+    if (/^cancel$|^no$|^nope$/.test(t)) return { type: 'CANCEL' };
 
     // --- game management ---
     if (/\bnew\s*game\b|\breset\b/.test(t)) return { type: 'NEW_GAME' };
     if (/\bundo\b|\btake\s*back\b/.test(t)) return { type: 'UNDO' };
     if (/\bside.?out\b|\bchange\s*serv/.test(t)) return { type: 'SIDE_OUT' };
-    if (/who.{0,10}serv/.test(t) || /\bserving\b/.test(t)) return { type: 'WHO_SERVES' };
+    // Require an explicit question — don't match "serving" alone (TTS feedback)
+    if (/who.{0,10}serv/.test(t) || /who'?s\s+(up|next)/.test(t)) return { type: 'WHO_SERVES' };
 
     // --- point detection ---
     const hasPointWord = /\b(point|scored?|gets?|fault|foul|wins?|won)\b/.test(t);
-    const hasTeamA = t.includes(teamA) || /\bteam\s*a\b|\bone\b|\bfirst\b/.test(t);
-    const hasTeamB = t.includes(teamB) || /\bteam\s*b\b|\btwo\b|\bsecond\b/.test(t);
+    // Only match explicit "team a/b" or the actual team name — not "one/two/first/second"
+    const hasTeamA = t.includes(teamA) || /\bteam\s*a\b/.test(t);
+    const hasTeamB = t.includes(teamB) || /\bteam\s*b\b/.test(t);
 
-    // Strict match: point keyword + team indicator
+    // Strict: point keyword + unambiguous team reference
     if (hasPointWord && hasTeamA && !hasTeamB) return { type: 'POINT_A' };
     if (hasPointWord && hasTeamB && !hasTeamA) return { type: 'POINT_B' };
 
-    // Lenient match: just the team indicator in a short utterance
-    if (!hasPointWord && hasTeamA && !hasTeamB && t.length <= 25) return { type: 'POINT_A' };
-    if (!hasPointWord && hasTeamB && !hasTeamA && t.length <= 25) return { type: 'POINT_B' };
+    // Lenient: just the team name by itself (short utterance, actual name required)
+    if (!hasPointWord && t.includes(teamA) && !t.includes(teamB) && t.length <= 20) return { type: 'POINT_A' };
+    if (!hasPointWord && t.includes(teamB) && !t.includes(teamA) && t.length <= 20) return { type: 'POINT_B' };
 
     return null;
   }
