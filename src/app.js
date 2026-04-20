@@ -38,8 +38,6 @@ class App {
     this._render();
     this._registerSW();
     this._watchOnline();
-    // Pre-load Whisper model in the background so it's ready when the game starts
-    this._initVoice();
   }
 
   dispatch(action) {
@@ -57,7 +55,8 @@ class App {
           game,
           settings: { ...this.state.settings, ...action.config },
         });
-        this._initVoice(action.config.teamAName, action.config.teamBName);
+        // Update team names only if voice is already running — don't force init here
+        if (this.voice) this.voice.updateTeamNames(action.config.teamAName, action.config.teamBName);
         break;
       }
 
@@ -70,7 +69,7 @@ class App {
 
         if (next.gameOver) {
           const winnerName = next.winner === 'A' ? next.teamAName : next.teamBName;
-          this.voice?.speak(`Game over! ${winnerName} wins!`);
+          this._speak(`Game over! ${winnerName} wins!`);
           // Save to history
           const record = {
             id: Date.now(),
@@ -86,7 +85,7 @@ class App {
           };
           this._setState({ gameHistory: [record, ...this.state.gameHistory].slice(0, 100) });
         } else {
-          this.voice?.speak(getScoreAnnouncement(next));
+          this._speak(getScoreAnnouncement(next));
         }
         break;
       }
@@ -114,21 +113,15 @@ class App {
 
       case 'TAP_LISTEN': {
         if (!this.voice) this._initVoice();
-        if (!this.voice?.isSupported) {
+        if (!this.voice) return; // user declined the download dialog
+        if (!this.voice.isSupported) {
           showToast('Voice not supported in this browser — try Chrome or Safari');
-          return;
-        }
-        if (this.state.whisperModel.state === 'loading') {
-          const p = this.state.whisperModel.progress;
-          showToast(`Voice model loading${p ? ` (${p}%)` : ''}… please wait`);
           return;
         }
         if (this.state.voiceListening) {
           this.voice.stopListening();
-          showToast('🎤 Voice off');
         } else {
-          this.voice.startListening();
-          showToast('🎤 Listening — speak a command');
+          this.voice.startListening(); // WhisperEngine handles its own not-ready guard
         }
         break;
       }
@@ -140,8 +133,7 @@ class App {
 
       case 'SPEAK_SCORE': {
         const { game } = this.state;
-        if (!this.voice) this._initVoice();
-        if (game) this.voice?.speak(getScoreAnnouncement(game));
+        if (game) this._speak(getScoreAnnouncement(game));
         break;
       }
 
@@ -152,16 +144,14 @@ class App {
         this.undoStack.push(game);
         const next = rallyWon(game, receivingTeam);
         this._setState({ game: next, voicePending: null });
-        if (this.voice) {
-          if (next.servingTeam !== game.servingTeam) {
-            const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
-            const srv = (next.gameMode === 'doubles' && next.scoringType === 'traditional')
-              ? `, Server ${next.serverNumber}` : '';
-            this.voice.speak(`Side out! ${name} serving${srv}.`);
-          } else {
-            const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
-            this.voice.speak(`Server ${next.serverNumber}. ${name} still serving.`);
-          }
+        if (next.servingTeam !== game.servingTeam) {
+          const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
+          const srv = (next.gameMode === 'doubles' && next.scoringType === 'traditional')
+            ? `, Server ${next.serverNumber}` : '';
+          this._speak(`Side out! ${name} serving${srv}.`);
+        } else {
+          const name = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
+          this._speak(`Server ${next.serverNumber}. ${name} still serving.`);
         }
         showToast('Side-out confirmed');
         break;
@@ -278,7 +268,7 @@ class App {
           voicePending: { type: 'SIDE_OUT', expiresAt: Date.now() + CONFIRM_MS },
         });
         // Speak the prompt so players hear it without looking at the screen
-        this.voice?.speak('Side out? Say confirm, or tap Confirm to proceed.');
+        this._speak('Side out? Say confirm, or tap Confirm to proceed.');
         this._pendingTimer = setTimeout(() => {
           this._setState({ voicePending: null });
         }, CONFIRM_MS);
@@ -288,7 +278,7 @@ class App {
         const { game } = this.state;
         if (game) {
           const name = game.servingTeam === 'A' ? game.teamAName : game.teamBName;
-          this.voice?.speak(`${name} is serving.`);
+          this._speak(`${name} is serving.`);
         }
         break;
       }
@@ -301,6 +291,20 @@ class App {
         this._setState({ voiceListening: false });
         break;
     }
+  }
+
+  // TTS independent of Whisper — always works, fixes Chrome speechSynthesis bugs
+  _speak(text) {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    // Chrome bug: synthesis silently fails when paused (e.g. after tab switch)
+    if (synth.paused) synth.resume();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 0.92;
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
+    synth.speak(utt);
   }
 
   _watchOnline() {
