@@ -81,6 +81,18 @@ function checkWin(state) {
   }
 }
 
+/**
+ * Rotate the server within the current serving team (doubles traditional only).
+ * Server 1 → Server 2. If already on Server 2, this is a no-op — caller should
+ * use side-out instead.
+ */
+export function changeServer(state) {
+  if (state.gameMode !== 'doubles' || state.scoringType !== 'traditional') return null;
+  if (state.gameOver) return null;
+  if (state.serverNumber !== 1) return null; // already server 2 — tell caller
+  return { ...state, serverNumber: 2 };
+}
+
 /** Returns a spoken-word score announcement. */
 export function getScoreAnnouncement(state) {
   const {

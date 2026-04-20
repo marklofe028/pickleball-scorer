@@ -135,7 +135,8 @@ export class VoiceEngine {
     // --- game management ---
     if (/\bnew\s*game\b|\breset\b/.test(t)) return { type: 'NEW_GAME' };
     if (/\bundo\b|\btake\s*back\b/.test(t)) return { type: 'UNDO' };
-    if (/\bside.?out\b|\bchange\s*serv/.test(t)) return { type: 'SIDE_OUT' };
+    if (/\bside.?out\b/.test(t)) return { type: 'SIDE_OUT' };
+    if (/\bchange\s*serv|\bsecond\s*serv|\b2nd\s*serv/.test(t)) return { type: 'CHANGE_SERVER' };
     // Require an explicit question — don't match "serving" alone (TTS feedback)
     if (/who.{0,10}serv/.test(t) || /who'?s\s+(up|next)/.test(t)) return { type: 'WHO_SERVES' };
 

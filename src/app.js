@@ -1,4 +1,4 @@
-import { createInitialState, rallyWon, getScoreAnnouncement } from './modules/scoring.js';
+import { createInitialState, rallyWon, changeServer, getScoreAnnouncement } from './modules/scoring.js';
 import { loadAppState, saveAppState } from './modules/storage.js';
 import { VoiceEngine } from './modules/voice.js';
 import { showToast } from './modules/utils.js';
@@ -135,6 +135,26 @@ class App {
         break;
       }
 
+      case 'CHANGE_SERVER': {
+        const { game } = this.state;
+        if (!game || game.gameOver) return;
+        const next = changeServer(game);
+        if (!next) {
+          const msg = (game.gameMode === 'doubles' && game.scoringType === 'traditional')
+            ? 'Already on server 2 — call side out instead'
+            : 'Server rotation only applies in traditional doubles';
+          showToast(msg);
+          this._speak(msg);
+          return;
+        }
+        this.undoStack.push(game);
+        this._setState({ game: next });
+        const sName = next.servingTeam === 'A' ? next.teamAName : next.teamBName;
+        this._speak(`Server 2. ${sName} serving.`);
+        showToast('Server 2');
+        break;
+      }
+
       case 'SIDE_OUT': {
         const { game } = this.state;
         if (!game || game.gameOver) return;
@@ -231,7 +251,8 @@ class App {
       case 'POINT_B':    showToast(`🎤 Point → ${this.state.game?.teamBName || 'Team B'}`); this.dispatch({ type: 'RALLY_WON', team: 'B' }); break;
       case 'UNDO':       showToast('🎤 Undo'); this.dispatch({ type: 'UNDO' }); break;
       case 'NEW_GAME':   showToast('🎤 New game'); this.dispatch({ type: 'CONFIRM_NEW_GAME' }); break;
-      case 'READ_SCORE': this.dispatch({ type: 'SPEAK_SCORE' }); break;
+      case 'READ_SCORE':     this.dispatch({ type: 'SPEAK_SCORE' }); break;
+      case 'CHANGE_SERVER':  this.dispatch({ type: 'CHANGE_SERVER' }); break;
       case 'CONFIRM':
         if (this.state.voicePending) this.dispatch({ type: 'CONFIRM_VOICE_PENDING' });
         break;

@@ -120,7 +120,9 @@ export class ScoreBoard {
                 <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Add a point to that team</td></tr>
                 <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B</td></tr>
                 <tr><td class="voice-cmd-table__say">"point one" / "point two"</td><td>Team one or two</td></tr>
-                <tr><td class="voice-cmd-table__say">"side out"</td><td>Receiving team wins rally — rotates or changes serve</td></tr>
+                <tr><td class="voice-cmd-table__say">"change server"</td><td>Server 1 loses — server 2 takes over (same team)</td></tr>
+                <tr><td class="voice-cmd-table__say">"second server"</td><td>Same as "change server"</td></tr>
+                <tr><td class="voice-cmd-table__say">"side out"</td><td>Server 2 loses — other team gets serve</td></tr>
                 <tr><td class="voice-cmd-table__say">"undo"</td><td>Reverse last rally</td></tr>
                 <tr><td class="voice-cmd-table__say">"who's serving"</td><td>Announce serving team</td></tr>
                 <tr><td class="voice-cmd-table__say">"new game"</td><td>Start a new game</td></tr>
