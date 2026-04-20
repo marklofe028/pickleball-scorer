@@ -190,7 +190,7 @@ export class ScoreBoard {
   }
 
   update(state) {
-    const { game, voiceListening, voiceContinuous, whisperModel, voicePending } = state;
+    const { game, voiceListening, voicePending } = state;
 
     // Voice pending confirmation banner
     const pendingEl = this.container.querySelector('#voicePending');
@@ -265,39 +265,9 @@ export class ScoreBoard {
     // Voice listen button
     const btnListen = this.container.querySelector('#btnListen');
     const listenLabel = this.container.querySelector('#listenLabel');
-    const modelLoading = whisperModel && whisperModel.state === 'loading';
-    if (voiceListening) {
-      btnListen.classList.add('footer-btn--active');
-      listenLabel.textContent = 'Listening…';
-    } else if (modelLoading) {
-      btnListen.classList.remove('footer-btn--active');
-      listenLabel.textContent = whisperModel.progress ? `${whisperModel.progress}%` : 'Loading…';
-    } else {
-      btnListen.classList.remove('footer-btn--active');
-      listenLabel.textContent = 'Listen';
-    }
-    btnListen.disabled = modelLoading;
-
-    // Diag panel — model status
-    const diagStatus = this.container.querySelector('#diagModelStatus');
-    if (diagStatus && whisperModel) {
-      const { state, progress } = whisperModel;
-      if (state === 'ready') { diagStatus.textContent = 'ready ✓'; diagStatus.style.color = 'var(--green)'; }
-      else if (state === 'loading') { diagStatus.textContent = progress ? `loading ${progress}%` : 'loading…'; diagStatus.style.color = 'var(--text-dim)'; }
-      else if (state === 'error') { diagStatus.textContent = 'error ✗'; diagStatus.style.color = '#f66'; }
-      else { diagStatus.textContent = 'idle'; diagStatus.style.color = 'var(--text-dim)'; }
-    }
-
-    // Continuous mode button
-    const btnContinuous = this.container.querySelector('#btnContinuous');
-    const continuousLabel = this.container.querySelector('#continuousLabel');
-    if (voiceContinuous) {
-      btnContinuous.classList.add('footer-btn--active');
-      continuousLabel.textContent = 'Always On';
-    } else {
-      btnContinuous.classList.remove('footer-btn--active');
-      continuousLabel.textContent = 'Always On';
-    }
+    btnListen.classList.toggle('footer-btn--active', voiceListening);
+    listenLabel.textContent = voiceListening ? 'Listening…' : 'Listen';
+    btnListen.disabled = false;
 
     // Listening ring
     this._show('listeningRing', voiceListening);

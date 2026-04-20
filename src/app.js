@@ -1,6 +1,6 @@
 import { createInitialState, rallyWon, getScoreAnnouncement } from './modules/scoring.js';
 import { loadAppState, saveAppState } from './modules/storage.js';
-import { WhisperEngine } from './modules/voice.js';
+import { VoiceEngine } from './modules/voice.js';
 import { showToast } from './modules/utils.js';
 import { SetupScreen } from './components/SetupScreen.js';
 import { ScoreBoard } from './components/ScoreBoard.js';
@@ -11,8 +11,6 @@ const DEFAULT_STATE = {
   game: null,
   gameHistory: [],
   voiceListening: false,
-  voiceContinuous: false,
-  whisperModel: { state: 'idle', progress: 0 },
   voicePending: null,   // { type, expiresAt } — awaiting voice confirmation
   settings: {
     teamAName: 'Team A',
@@ -209,21 +207,7 @@ class App {
     const b = teamBName || this.state.settings.teamBName || 'Team B';
 
     if (!this.voice) {
-      // Warn about the one-time 145 MB download if not already cached
-      const alreadyCached = localStorage.getItem('whisper-base-ready');
-      if (!alreadyCached) {
-        const ok = confirm(
-          'Voice recognition requires a one-time download of ~145 MB.\n\n' +
-          'After downloading, it works fully offline — no internet needed.\n\n' +
-          'Download now? (Best done on Wi-Fi)'
-        );
-        if (!ok) {
-          this._setState({ whisperModel: { state: 'idle', progress: 0 } });
-          return;
-        }
-      }
-
-      this.voice = new WhisperEngine({
+      this.voice = new VoiceEngine({
         teamAName: a,
         teamBName: b,
         onCommand: (cmd) => this._handleVoiceCommand(cmd),
@@ -234,12 +218,6 @@ class App {
         },
         onListeningChange: (listening) => {
           this._setState({ voiceListening: listening });
-        },
-        onModelStatus: (status) => {
-          if (status.state === 'ready') {
-            localStorage.setItem('whisper-base-ready', '1');
-          }
-          this._setState({ whisperModel: { state: status.state, progress: status.progress ?? 0 } });
         },
       });
     } else {
@@ -283,13 +261,21 @@ class App {
         break;
       }
       case 'MIC_DENIED':
-        showToast('Microphone access denied');
+        showToast('Microphone access denied — check browser permissions');
         this._setState({ voiceListening: false });
         break;
-      case 'VOICE_ERROR':
-        showToast(cmd.message || 'Voice error');
+      case 'VOICE_ERROR': {
+        const msg = cmd.message || 'Voice error';
+        const isNetwork = msg.toLowerCase().includes('network') || msg.toLowerCase().includes('internet');
+        showToast(
+          isNetwork
+            ? 'Voice needs internet — download offline speech in Android Settings → General Management → Language → Offline speech recognition'
+            : msg,
+          isNetwork ? 6000 : 3000
+        );
         this._setState({ voiceListening: false });
         break;
+      }
     }
   }
 
