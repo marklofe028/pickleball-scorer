@@ -279,19 +279,20 @@ class App {
     }
   }
 
-  // TTS — mutes the mic while speaking to prevent feedback loops
+  // TTS — mutes transcript processing while speaking to prevent feedback loops.
+  // Recognition keeps running so it can never get stuck.
   _speak(text) {
     const synth = window.speechSynthesis;
     if (!synth) return;
     synth.cancel();
     if (synth.paused) synth.resume(); // Chrome bug: silently fails when paused
-    this.voice?.pauseForSpeech();
+    // Estimate mute window: ~80ms per character + 1s padding, min 3s
+    const muteMs = Math.max(3000, text.length * 80 + 1000);
+    this.voice?.muteForMs(muteMs);
     const utt = new SpeechSynthesisUtterance(text);
     utt.rate = 0.92;
     utt.pitch = 1.0;
     utt.volume = 1.0;
-    utt.onend = () => this.voice?.resumeAfterSpeech();
-    utt.onerror = () => this.voice?.resumeAfterSpeech();
     synth.speak(utt);
   }
 

@@ -46,7 +46,7 @@ export class VoiceEngine {
 
     this.recognition = null;
     this.isListening = false;
-    this._speaking = false; // true while TTS is playing — suppresses mic restart
+    this._muteUntil = 0; // epoch ms — ignore transcripts before this time
 
     this._initRecognition();
   }
@@ -70,6 +70,7 @@ export class VoiceEngine {
     this.recognition.maxAlternatives = 3;
 
     this.recognition.onresult = (e) => {
+      if (Date.now() < this._muteUntil) return; // ignore while TTS is playing
       const transcript = Array.from(e.results)
         .map(r => r[0].transcript)
         .join(' ')
@@ -101,31 +102,20 @@ export class VoiceEngine {
     };
 
     this.recognition.onend = () => {
-      if (this.isListening && !this._speaking) {
+      if (this.isListening) {
         setTimeout(() => {
           try { this.recognition.start(); } catch { /* already restarting */ }
         }, 150);
-      } else if (!this.isListening) {
+      } else {
         this.onListeningChange(false);
       }
-      // If _speaking, don't restart — resumeAfterSpeech() will do it
     };
   }
 
-  /** Pause mic while TTS is playing to prevent feedback loops. */
-  pauseForSpeech() {
-    this._speaking = true;
-    try { this.recognition?.abort(); } catch {}
-  }
-
-  /** Resume mic after TTS finishes. */
-  resumeAfterSpeech() {
-    this._speaking = false;
-    if (this.isListening) {
-      setTimeout(() => {
-        try { this.recognition?.start(); } catch {}
-      }, 400);
-    }
+  /** Mute transcript processing for the duration of a TTS utterance.
+   *  Recognition keeps running — no abort/restart — so it can never get stuck. */
+  muteForMs(ms) {
+    this._muteUntil = Date.now() + ms;
   }
 
   /** Parse a lowercase transcript into a command object or null. */
