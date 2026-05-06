@@ -183,7 +183,13 @@ export class VoiceEngine {
     // Require an explicit question — don't match "serving" alone (TTS feedback)
     if (/who.{0,10}serv/.test(t) || /who'?s\s+(up|next)/.test(t)) return { type: 'WHO_SERVES' };
 
-    // --- point detection ---
+    // --- server / receiver scoring (works regardless of team name language) ---
+    // "server" alone, or "server scores/point/wins"
+    if (/\bserver\b/.test(t) && !/change|second|2nd/.test(t)) return { type: 'POINT_SERVING' };
+    // "receiver" alone, or "receiver scores/point/wins"
+    if (/\breceiver\b/.test(t)) return { type: 'POINT_RECEIVING' };
+
+    // --- team-name point detection (fallback for default "Team A / Team B") ---
     const hasPointWord = /\b(point|scored?|gets?|fault|foul|wins?|won)\b/.test(t);
     const hasTeamA = teamMatch(t, teamA) || /\bteam\s*a\b/.test(t);
     const hasTeamB = teamMatch(t, teamB) || /\bteam\s*b\b/.test(t);

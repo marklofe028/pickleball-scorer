@@ -117,9 +117,10 @@ export class ScoreBoard {
             <table class="voice-cmd-table">
               <tbody id="vcmdTeamRows">
                 <tr><td class="voice-cmd-table__say">"score"</td><td>Read current score aloud</td></tr>
+                <tr><td class="voice-cmd-table__say">"server"</td><td>Point for the serving team</td></tr>
+                <tr><td class="voice-cmd-table__say">"receiver"</td><td>Point for the receiving team</td></tr>
                 <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Add a point to that team</td></tr>
                 <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B</td></tr>
-                <tr><td class="voice-cmd-table__say">"point one" / "point two"</td><td>Team one or two</td></tr>
                 <tr><td class="voice-cmd-table__say">"change server"</td><td>Server 1 loses — server 2 takes over (same team)</td></tr>
                 <tr><td class="voice-cmd-table__say">"second server"</td><td>Same as "change server"</td></tr>
                 <tr><td class="voice-cmd-table__say">"side out"</td><td>Server 2 loses — other team gets serve</td></tr>

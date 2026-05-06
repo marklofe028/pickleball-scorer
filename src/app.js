@@ -249,6 +249,23 @@ class App {
     switch (cmd.type) {
       case 'POINT_A':    showToast(`🎤 Point → ${this.state.game?.teamAName || 'Team A'}`); this.dispatch({ type: 'RALLY_WON', team: 'A' }); break;
       case 'POINT_B':    showToast(`🎤 Point → ${this.state.game?.teamBName || 'Team B'}`); this.dispatch({ type: 'RALLY_WON', team: 'B' }); break;
+      case 'POINT_SERVING': {
+        const g = this.state.game;
+        if (!g) return;
+        const name = g.servingTeam === 'A' ? g.teamAName : g.teamBName;
+        showToast(`🎤 Point → ${name} (server)`);
+        this.dispatch({ type: 'RALLY_WON', team: g.servingTeam });
+        break;
+      }
+      case 'POINT_RECEIVING': {
+        const g = this.state.game;
+        if (!g) return;
+        const receiving = g.servingTeam === 'A' ? 'B' : 'A';
+        const name = receiving === 'A' ? g.teamAName : g.teamBName;
+        showToast(`🎤 Point → ${name} (receiver)`);
+        this.dispatch({ type: 'RALLY_WON', team: receiving });
+        break;
+      }
       case 'UNDO':       showToast('🎤 Undo'); this.dispatch({ type: 'UNDO' }); break;
       case 'NEW_GAME':   showToast('🎤 New game'); this.dispatch({ type: 'CONFIRM_NEW_GAME' }); break;
       case 'READ_SCORE':     this.dispatch({ type: 'SPEAK_SCORE' }); break;
