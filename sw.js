@@ -1,4 +1,4 @@
-const CACHE = 'pickle-score-v13';
+const CACHE = 'pickle-score-v14';
 
 const ASSETS = [
   './',

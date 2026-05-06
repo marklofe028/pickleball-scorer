@@ -180,14 +180,14 @@ export class VoiceEngine {
     if (/\bundo\b|\btake\s*back\b/.test(t)) return { type: 'UNDO' };
     if (/\bside.?out\b/.test(t)) return { type: 'SIDE_OUT' };
     if (/\bchange\s*serv|\bsecond\s*serv|\b2nd\s*serv/.test(t)) return { type: 'CHANGE_SERVER' };
-    // Require an explicit question — don't match "serving" alone (TTS feedback)
-    if (/who.{0,10}serv/.test(t) || /who'?s\s+(up|next)/.test(t)) return { type: 'WHO_SERVES' };
+    // "server" alone or any question about the server → WHO_SERVES
+    if (/^server$/.test(t) || /who.{0,10}serv/.test(t) || /who'?s\s+(up|next)/.test(t)) return { type: 'WHO_SERVES' };
 
     // --- server / receiver scoring (works regardless of team name language) ---
-    // "server" alone, or "server scores/point/wins"
-    if (/\bserver\b/.test(t) && !/change|second|2nd/.test(t)) return { type: 'POINT_SERVING' };
-    // "receiver" alone, or "receiver scores/point/wins"
-    if (/\breceiver\b/.test(t)) return { type: 'POINT_RECEIVING' };
+    // Must include an explicit scoring word — "server" alone stays as WHO_SERVES
+    const scoreWord = /\b(scores?|points?|wins?|got\s+it|mark)\b/;
+    if (/\bserver\b/.test(t) && scoreWord.test(t) && !/change|second|2nd/.test(t)) return { type: 'POINT_SERVING' };
+    if (/\breceiver\b/.test(t) && scoreWord.test(t)) return { type: 'POINT_RECEIVING' };
 
     // --- team-name point detection (fallback for default "Team A / Team B") ---
     const hasPointWord = /\b(point|scored?|gets?|fault|foul|wins?|won)\b/.test(t);
