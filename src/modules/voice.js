@@ -24,12 +24,50 @@ async function resampleTo16k(arrayBuffer) {
   return new Float32Array(resampled.getChannelData(0));
 }
 
+// ---------------------------------------------------------------------------
+// Fuzzy team-name matching
+// ---------------------------------------------------------------------------
+
+/** Strip accents and lowercase — "Bretaña" → "bretana". */
+function normalizeStr(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+/** Levenshtein edit distance between two strings. */
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const row = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = row[j];
+      row[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, row[j], row[j - 1]);
+      prev = tmp;
+    }
+  }
+  return row[n];
+}
+
+/**
+ * Return true if the transcript plausibly contains the team name.
+ * Handles:
+ *  - exact substring after accent-stripping
+ *  - phonetic drift: each word in the transcript is checked against the
+ *    team name with a Levenshtein threshold proportional to name length,
+ *    so "britannia" still matches "Bretaña" (→ "bretana").
+ */
+function teamMatch(transcript, teamName) {
+  const t = normalizeStr(transcript);
+  const name = normalizeStr(teamName);
+  if (!name) return false;
+  if (t.includes(name)) return true;
+  const threshold = Math.max(1, Math.floor(name.length / 3));
+  return t.split(/\s+/).some(word => levenshtein(word, name) <= threshold);
+}
+
 /**
  * VoiceEngine — wraps Web Speech API (recognition + synthesis).
- *
- * Modes:
- *   one-shot  (default) — tap mic, speak one command, recognition stops.
- *   continuous          — recognition restarts automatically after each result.
  *
  * Callbacks:
  *   onCommand({ type })   — fired when a command is parsed
@@ -46,7 +84,8 @@ export class VoiceEngine {
 
     this.recognition = null;
     this.isListening = false;
-    this._muteUntil = 0; // epoch ms — ignore transcripts before this time
+    this._muteUntil = 0;    // epoch ms — ignore transcripts before this time
+    this._watchdogTimer = null; // restarts recognition if it silently drops
 
     this._initRecognition();
   }
@@ -84,6 +123,7 @@ export class VoiceEngine {
 
     this.recognition.onaudiostart = () => {
       this.onListeningChange(true);
+      this._resetWatchdog();
     };
 
     this.recognition.onerror = (e) => {
@@ -104,7 +144,10 @@ export class VoiceEngine {
     this.recognition.onend = () => {
       if (this.isListening) {
         setTimeout(() => {
-          try { this.recognition.start(); } catch { /* already restarting */ }
+          try {
+            this.recognition.start();
+            this._resetWatchdog();
+          } catch { /* already restarting */ }
         }, 150);
       } else {
         this.onListeningChange(false);
@@ -142,17 +185,16 @@ export class VoiceEngine {
 
     // --- point detection ---
     const hasPointWord = /\b(point|scored?|gets?|fault|foul|wins?|won)\b/.test(t);
-    // Only match explicit "team a/b" or the actual team name — not "one/two/first/second"
-    const hasTeamA = t.includes(teamA) || /\bteam\s*a\b/.test(t);
-    const hasTeamB = t.includes(teamB) || /\bteam\s*b\b/.test(t);
+    const hasTeamA = teamMatch(t, teamA) || /\bteam\s*a\b/.test(t);
+    const hasTeamB = teamMatch(t, teamB) || /\bteam\s*b\b/.test(t);
 
     // Strict: point keyword + unambiguous team reference
     if (hasPointWord && hasTeamA && !hasTeamB) return { type: 'POINT_A' };
     if (hasPointWord && hasTeamB && !hasTeamA) return { type: 'POINT_B' };
 
-    // Lenient: just the team name by itself (short utterance, actual name required)
-    if (!hasPointWord && t.includes(teamA) && !t.includes(teamB) && t.length <= 20) return { type: 'POINT_A' };
-    if (!hasPointWord && t.includes(teamB) && !t.includes(teamA) && t.length <= 20) return { type: 'POINT_B' };
+    // Lenient: team name alone in a short utterance
+    if (!hasPointWord && hasTeamA && !hasTeamB && t.length <= 20) return { type: 'POINT_A' };
+    if (!hasPointWord && hasTeamB && !hasTeamA && t.length <= 20) return { type: 'POINT_B' };
 
     return null;
   }
@@ -171,10 +213,25 @@ export class VoiceEngine {
 
   stopListening() {
     if (!this.recognition) return;
-    this.continuous = false;
     this.isListening = false;
+    this._clearWatchdog();
     this.onListeningChange(false);
     try { this.recognition.abort(); } catch { /* ignore */ }
+  }
+
+  /** Watchdog: if onaudiostart hasn't fired within 8 s, force a restart. */
+  _resetWatchdog() {
+    this._clearWatchdog();
+    this._watchdogTimer = setTimeout(() => {
+      if (!this.isListening) return;
+      try { this.recognition.abort(); } catch {}
+      // onend will restart automatically
+    }, 8000);
+  }
+
+  _clearWatchdog() {
+    clearTimeout(this._watchdogTimer);
+    this._watchdogTimer = null;
   }
 
   toggleListening() {
