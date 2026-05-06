@@ -90,13 +90,20 @@ export class SetupScreen {
               <p class="voice-help__note">Tap <strong>Listen</strong> on the scoreboard then speak a command. Tap <strong>Always On</strong> to keep mic open continuously.</p>
               <table class="voice-cmd-table">
                 <tbody>
-                  <tr><td class="voice-cmd-table__say">"score"</td><td>Reads current score aloud</td></tr>
-                  <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Adds a point to that team</td></tr>
-                  <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B point</td></tr>
-                  <tr><td class="voice-cmd-table__say">"side out"</td><td>Receiving team wins rally — rotates or changes serve</td></tr>
-                  <tr><td class="voice-cmd-table__say">"undo"</td><td>Reverses last rally</td></tr>
-                  <tr><td class="voice-cmd-table__say">"who's serving"</td><td>Announces serving team</td></tr>
-                  <tr><td class="voice-cmd-table__say">"new game"</td><td>Starts a new game</td></tr>
+                  <tr><td class="voice-cmd-table__say">"score"</td><td>Read current score aloud</td></tr>
+                  <tr><td class="voice-cmd-table__say">"server scores"</td><td>Point for the serving team</td></tr>
+                  <tr><td class="voice-cmd-table__say">"server wins"</td><td>Point for the serving team</td></tr>
+                  <tr><td class="voice-cmd-table__say">"receiver scores"</td><td>Point for the receiving team</td></tr>
+                  <tr><td class="voice-cmd-table__say">"receiver wins"</td><td>Point for the receiving team</td></tr>
+                  <tr><td class="voice-cmd-table__say">"server"</td><td>Announce who is serving</td></tr>
+                  <tr><td class="voice-cmd-table__say">"point [team name]"</td><td>Add a point to that team</td></tr>
+                  <tr><td class="voice-cmd-table__say">"point a" / "point b"</td><td>Generic team A or B</td></tr>
+                  <tr><td class="voice-cmd-table__say">"change server"</td><td>Server 1 loses — server 2 takes over</td></tr>
+                  <tr><td class="voice-cmd-table__say">"second server"</td><td>Same as "change server"</td></tr>
+                  <tr><td class="voice-cmd-table__say">"side out"</td><td>Server 2 loses — other team gets serve</td></tr>
+                  <tr><td class="voice-cmd-table__say">"undo"</td><td>Reverse last rally</td></tr>
+                  <tr><td class="voice-cmd-table__say">"who's serving"</td><td>Announce serving team</td></tr>
+                  <tr><td class="voice-cmd-table__say">"new game"</td><td>Start a new game</td></tr>
                 </tbody>
               </table>
               <p class="voice-help__tip">💡 Use your team names for best accuracy — e.g. <em>"point Lakers"</em></p>
